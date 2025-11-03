@@ -1,0 +1,772 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🎯 Face Recognition Attendance System</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide-react@0.292.0/dist/umd/lucide-react.min.js"></script>
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Face-API.js -->
+    <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
+
+    <style>
+        /* Custom Styles based on your UI/UX Design System */
+        :root {
+            --primary-500: #0ea5e9;
+            --primary-600: #0284c7;
+            --gray-900: #0f172a;
+            --font-heading: 'Space Grotesk', sans-serif;
+            --font-body: 'Inter', sans-serif;
+        }
+        body {
+            font-family: var(--font-body);
+            background-color: #f8fafc; /* gray-50 */
+            color: var(--gray-900);
+        }
+        h1, h2, h3, h4, h5, h6 {
+            font-family: var(--font-heading);
+        }
+        .gradient-text {
+            background: linear-gradient(to right, var(--primary-500), var(--primary-600));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .btn-primary {
+            background-image: linear-gradient(to right, var(--primary-500) 0%, var(--primary-600) 100%);
+            transition: all 0.2s;
+        }
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(2, 132, 199, 0.3);
+        }
+        .card {
+            transition: all 0.2s ease-in-out;
+        }
+        .card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.08);
+        }
+        .toast {
+            animation: slide-in 0.5s forwards, fade-out 0.5s 2.5s forwards;
+        }
+        @keyframes slide-in {
+            from { transform: translateY(100%); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+        @keyframes fade-out {
+            from { opacity: 1; }
+            to { opacity: 0; }
+        }
+        /* Hide scrollbar but allow scrolling */
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    </style>
+</head>
+<body class="bg-gray-50 text-slate-800">
+
+    <!-- Loading Overlay -->
+    <div id="loading-overlay" class="fixed inset-0 bg-white/80 backdrop-blur-sm z-50 flex flex-col items-center justify-center">
+        <div class="w-16 h-16 border-4 border-sky-500 border-t-transparent rounded-full animate-spin"></div>
+        <p id="loading-text" class="mt-4 text-lg font-semibold text-sky-600">Initializing AI Models...</p>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="toast fixed bottom-5 right-5 hidden z-50 p-4 rounded-xl text-white font-semibold">
+        <p id="toast-message"></p>
+    </div>
+
+    <div class="flex h-screen bg-gray-100">
+        <!-- Sidebar -->
+        <aside class="w-64 bg-white shadow-md flex-shrink-0">
+            <div class="p-6">
+                <h1 class="text-2xl font-bold gradient-text">FaceTrack</h1>
+                <p class="text-xs text-gray-500 -mt-1">Attendance System</p>
+            </div>
+            <nav class="mt-6">
+                <a href="#" data-view="dashboard" class="nav-link bg-sky-100 text-sky-600 flex items-center px-6 py-3 font-semibold">
+                    <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path></svg>
+                    Dashboard
+                </a>
+                <a href="#" data-view="register" class="nav-link text-gray-600 hover:bg-gray-50 hover:text-gray-800 flex items-center px-6 py-3 font-medium">
+                    <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"></path></svg>
+                    Register User
+                </a>
+                <a href="#" data-view="mark-attendance" class="nav-link text-gray-600 hover:bg-gray-50 hover:text-gray-800 flex items-center px-6 py-3 font-medium">
+                    <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                    Mark Attendance
+                </a>
+                <a href="#" data-view="view-attendance" class="nav-link text-gray-600 hover:bg-gray-50 hover:text-gray-800 flex items-center px-6 py-3 font-medium">
+                    <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path></svg>
+                    View Records
+                </a>
+                 <a href="#" data-view="manage-users" class="nav-link text-gray-600 hover:bg-gray-50 hover:text-gray-800 flex items-center px-6 py-3 font-medium">
+                    <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M15 21a6 6 0 00-9-5.197M15 21a6 6 0 006-6v-1h-6v1z"></path></svg>
+                    Manage Users
+                </a>
+            </nav>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="flex-1 p-8 overflow-y-auto">
+            <!-- Dashboard View -->
+            <div id="dashboard-view" class="view">
+                <h2 class="text-3xl font-bold mb-6">Dashboard</h2>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <!-- Stats Cards -->
+                    <div class="bg-white p-6 rounded-2xl shadow-sm flex items-center justify-between">
+                        <div>
+                            <p class="text-gray-500 text-sm">Total Users Registered</p>
+                            <p id="total-users-stat" class="text-3xl font-bold">0</p>
+                        </div>
+                        <div class="bg-sky-100 p-3 rounded-full">
+                            <svg class="w-6 h-6 text-sky-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
+                        </div>
+                    </div>
+                    <div class="bg-white p-6 rounded-2xl shadow-sm flex items-center justify-between">
+                        <div>
+                            <p class="text-gray-500 text-sm">Attendance Marked Today</p>
+                            <p id="today-attendance-stat" class="text-3xl font-bold">0</p>
+                        </div>
+                        <div class="bg-emerald-100 p-3 rounded-full">
+                            <svg class="w-6 h-6 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                        </div>
+                    </div>
+                    <div class="bg-white p-6 rounded-2xl shadow-sm flex items-center justify-between">
+                        <div>
+                            <p class="text-gray-500 text-sm">Total Attendance Records</p>
+                            <p id="total-records-stat" class="text-3xl font-bold">0</p>
+                        </div>
+                        <div class="bg-violet-100 p-3 rounded-full">
+                           <svg class="w-6 h-6 text-violet-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path></svg>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Action Cards -->
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mt-8">
+                    <div data-view="register" class="card cursor-pointer bg-white p-6 rounded-2xl shadow-sm text-center">
+                        <div class="bg-sky-100 w-16 h-16 rounded-2xl mx-auto flex items-center justify-center">
+                            <svg class="w-8 h-8 text-sky-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"></path></svg>
+                        </div>
+                        <h3 class="font-bold text-lg mt-4">Register a New User</h3>
+                        <p class="text-gray-500 text-sm mt-1">Add a new person to the system.</p>
+                    </div>
+                     <div data-view="mark-attendance" class="card cursor-pointer bg-white p-6 rounded-2xl shadow-sm text-center">
+                        <div class="bg-emerald-100 w-16 h-16 rounded-2xl mx-auto flex items-center justify-center">
+                            <svg class="w-8 h-8 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                        </div>
+                        <h3 class="font-bold text-lg mt-4">Mark Attendance</h3>
+                        <p class="text-gray-500 text-sm mt-1">Record today's attendance.</p>
+                    </div>
+                     <div data-view="view-attendance" class="card cursor-pointer bg-white p-6 rounded-2xl shadow-sm text-center">
+                        <div class="bg-violet-100 w-16 h-16 rounded-2xl mx-auto flex items-center justify-center">
+                            <svg class="w-8 h-8 text-violet-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path></svg>
+                        </div>
+                        <h3 class="font-bold text-lg mt-4">View Attendance Records</h3>
+                        <p class="text-gray-500 text-sm mt-1">Check and export records.</p>
+                    </div>
+                     <div data-view="manage-users" class="card cursor-pointer bg-white p-6 rounded-2xl shadow-sm text-center">
+                        <div class="bg-amber-100 w-16 h-16 rounded-2xl mx-auto flex items-center justify-center">
+                             <svg class="w-8 h-8 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M15 21a6 6 0 00-9-5.197M15 21a6 6 0 006-6v-1h-6v1z"></path></svg>
+                        </div>
+                        <h3 class="font-bold text-lg mt-4">Manage Users</h3>
+                        <p class="text-gray-500 text-sm mt-1">View and remove users.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Register User View -->
+            <div id="register-view" class="view hidden">
+                <h2 class="text-3xl font-bold mb-6">Register New User</h2>
+                <div class="bg-white p-8 rounded-2xl shadow-sm grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <!-- Webcam and Capture -->
+                    <div class="flex flex-col items-center">
+                        <div class="w-full max-w-md bg-gray-200 rounded-lg overflow-hidden relative aspect-square">
+                            <video id="register-video" autoplay playsinline class="w-full h-full object-cover"></video>
+                            <canvas id="register-canvas" class="hidden"></canvas>
+                            <img id="register-photo" class="hidden w-full h-full object-cover" />
+                        </div>
+                        <div id="register-photo-guidelines" class="mt-4 text-center text-sm text-gray-500">
+                             <p>Please ensure good lighting and face the camera directly.</p>
+                        </div>
+                        <button id="capture-register-btn" class="mt-4 px-6 py-2 bg-white border-2 border-sky-500 text-sky-500 font-semibold rounded-lg hover:bg-sky-50 transition">
+                            Capture Photo
+                        </button>
+                    </div>
+                    <!-- Registration Form -->
+                    <form id="register-form" class="space-y-4">
+                        <div>
+                            <label for="name" class="block text-sm font-medium text-gray-700">Full Name</label>
+                            <input type="text" id="name" required class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-sky-500 focus:border-sky-500">
+                        </div>
+                        <div>
+                            <label for="employee-id" class="block text-sm font-medium text-gray-700">Student ID</label>
+                            <input type="text" id="employee-id" required class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-sky-500 focus:border-sky-500">
+                        </div>
+                         <div>
+                            <label for="department" class="block text-sm font-medium text-gray-700">Department</label>
+                            <input type="text" id="department" required class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-sky-500 focus:border-sky-500">
+                        </div>
+                        <div>
+                            <label for="email" class="block text-sm font-medium text-gray-700">Email Address</label>
+                            <input type="email" id="email" required class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-sky-500 focus:border-sky-500">
+                        </div>
+                        <button type="submit" class="w-full btn-primary text-white font-bold py-3 px-4 rounded-lg">
+                            Register User
+                        </button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Mark Attendance View -->
+            <div id="mark-attendance-view" class="view hidden">
+                 <h2 class="text-3xl font-bold mb-6">Mark Attendance</h2>
+                 <div class="bg-white p-8 rounded-2xl shadow-sm flex flex-col items-center">
+                    <div class="w-full max-w-lg bg-gray-200 rounded-lg overflow-hidden relative aspect-square">
+                        <video id="attendance-video" autoplay playsinline class="w-full h-full object-cover"></video>
+                         <canvas id="attendance-canvas" class="hidden"></canvas>
+                    </div>
+                     <p id="attendance-status" class="mt-4 text-center text-lg font-medium text-gray-600">Position your face in the frame...</p>
+                    <button id="mark-attendance-btn" class="mt-4 w-full max-w-lg btn-primary text-white font-bold py-3 px-4 rounded-lg">
+                        Mark My Attendance
+                    </button>
+                 </div>
+            </div>
+
+            <!-- View Attendance Records View -->
+            <div id="view-attendance-view" class="view hidden">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-3xl font-bold">Attendance Records</h2>
+                    <button id="export-csv-btn" class="px-4 py-2 bg-emerald-500 text-white font-semibold rounded-lg hover:bg-emerald-600 transition flex items-center">
+                       <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                        Export CSV
+                    </button>
+                </div>
+                <div class="bg-white p-6 rounded-2xl shadow-sm">
+                    <div class="mb-4 flex items-center space-x-4">
+                        <div>
+                            <label for="start-date" class="text-sm font-medium">Start Date:</label>
+                            <input type="date" id="start-date" class="border border-gray-300 rounded-md p-1">
+                        </div>
+                        <div>
+                            <label for="end-date" class="text-sm font-medium">End Date:</label>
+                            <input type="date" id="end-date" class="border border-gray-300 rounded-md p-1">
+                        </div>
+                        <button id="filter-attendance-btn" class="px-4 py-2 bg-sky-500 text-white font-semibold rounded-lg hover:bg-sky-600 transition">Filter</button>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="p-3 text-sm font-semibold">Photo</th>
+                                    <th class="p-3 text-sm font-semibold">Name</th>
+                                    <th class="p-3 text-sm font-semibold">Student ID</th>
+                                    <th class="p-3 text-sm font-semibold">Department</th>
+                                    <th class="p-3 text-sm font-semibold">Timestamp</th>
+                                </tr>
+                            </thead>
+                            <tbody id="attendance-table-body">
+                                <!-- Records will be populated here -->
+                            </tbody>
+                        </table>
+                        <div id="no-attendance-records" class="text-center py-8 text-gray-500 hidden">
+                            <p>No attendance records found.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Manage Users View -->
+            <div id="manage-users-view" class="view hidden">
+                <h2 class="text-3xl font-bold mb-6">Manage Users</h2>
+                <div class="bg-white p-6 rounded-2xl shadow-sm">
+                     <div class="overflow-x-auto">
+                        <table class="w-full text-left">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="p-3 text-sm font-semibold">Photo</th>
+                                    <th class="p-3 text-sm font-semibold">Name</th>
+                                    <th class="p-3 text-sm font-semibold">Student ID</th>
+                                    <th class="p-3 text-sm font-semibold">Department</th>
+                                    <th class="p-3 text-sm font-semibold">Email</th>
+                                    <th class="p-3 text-sm font-semibold">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="users-table-body">
+                                <!-- Users will be populated here -->
+                            </tbody>
+                        </table>
+                        <div id="no-users-found" class="text-center py-8 text-gray-500 hidden">
+                            <p>No users registered yet.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </main>
+    </div>
+
+    <script>
+    document.addEventListener('DOMContentLoaded', () => {
+
+        // --- STATE MANAGEMENT ---
+        let state = {
+            currentView: 'dashboard',
+            users: [],
+            attendance: [],
+            isWebcamOn: false,
+            registerPhotoData: null,
+            faceMatcher: null,
+        };
+
+        // --- DOM ELEMENTS ---
+        const views = document.querySelectorAll('.view');
+        const navLinks = document.querySelectorAll('.nav-link');
+        const actionCards = document.querySelectorAll('.card[data-view]');
+        const loadingOverlay = document.getElementById('loading-overlay');
+        const loadingText = document.getElementById('loading-text');
+
+        // Dashboard elements
+        const totalUsersStat = document.getElementById('total-users-stat');
+        const todayAttendanceStat = document.getElementById('today-attendance-stat');
+        const totalRecordsStat = document.getElementById('total-records-stat');
+
+        // Registration elements
+        const registerVideo = document.getElementById('register-video');
+        const registerCanvas = document.getElementById('register-canvas');
+        const registerPhoto = document.getElementById('register-photo');
+        const captureRegisterBtn = document.getElementById('capture-register-btn');
+        const registerForm = document.getElementById('register-form');
+
+        // Attendance elements
+        const attendanceVideo = document.getElementById('attendance-video');
+        const attendanceCanvas = document.getElementById('attendance-canvas');
+        const markAttendanceBtn = document.getElementById('mark-attendance-btn');
+        const attendanceStatus = document.getElementById('attendance-status');
+
+        // Records view elements
+        const attendanceTableBody = document.getElementById('attendance-table-body');
+        const noAttendanceRecords = document.getElementById('no-attendance-records');
+        const exportCsvBtn = document.getElementById('export-csv-btn');
+        const filterAttendanceBtn = document.getElementById('filter-attendance-btn');
+        
+        // Users view elements
+        const usersTableBody = document.getElementById('users-table-body');
+        const noUsersFound = document.getElementById('no-users-found');
+
+        // --- INITIALIZATION ---
+        async function initializeApp() {
+            try {
+                // Load data from localStorage
+                loadDataFromStorage();
+
+                // Load face-api.js models
+                loadingText.textContent = "Loading AI Models...";
+                await faceapi.nets.ssdMobilenetv1.loadFromUri('/models');
+                await faceapi.nets.faceLandmark68Net.loadFromUri('/models');
+                await faceapi.nets.faceRecognitionNet.loadFromUri('/models');
+                
+                // Create FaceMatcher for recognition
+                loadingText.textContent = "Preparing recognition engine...";
+                await createFaceMatcher();
+
+                // Initial render
+                updateDashboardStats();
+                showView('dashboard');
+                
+                loadingOverlay.style.display = 'none';
+            } catch (error) {
+                console.error("Initialization failed:", error);
+                loadingText.textContent = "Failed to load. Please refresh.";
+                showToast("Error initializing the application.", "error");
+            }
+        }
+
+        // --- NAVIGATION ---
+        function showView(viewId) {
+            state.currentView = viewId;
+            views.forEach(view => view.classList.add('hidden'));
+            document.getElementById(`${viewId}-view`).classList.remove('hidden');
+
+            navLinks.forEach(link => {
+                if (link.dataset.view === viewId) {
+                    link.classList.add('bg-sky-100', 'text-sky-600');
+                } else {
+                    link.classList.remove('bg-sky-100', 'text-sky-600');
+                }
+            });
+
+            // Handle webcam start/stop based on view
+            if (viewId === 'register' || viewId === 'mark-attendance') {
+                const videoElement = viewId === 'register' ? registerVideo : attendanceVideo;
+                startWebcam(videoElement);
+            } else {
+                stopWebcam();
+            }
+            
+            // Re-render tables when switching to their views
+            if (viewId === 'manage-users') renderUsersTable();
+            if (viewId === 'view-attendance') renderAttendanceTable();
+        }
+
+        navLinks.forEach(link => {
+            link.addEventListener('click', (e) => {
+                e.preventDefault();
+                showView(e.currentTarget.dataset.view);
+            });
+        });
+
+        actionCards.forEach(card => {
+            card.addEventListener('click', (e) => {
+                showView(e.currentTarget.dataset.view);
+            });
+        });
+
+        // --- WEBCAM MANAGEMENT ---
+        async function startWebcam(videoElement) {
+            if (state.isWebcamOn) return;
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: {} });
+                videoElement.srcObject = stream;
+                state.isWebcamOn = true;
+                if(state.currentView === 'register') {
+                    registerPhoto.classList.add('hidden');
+                    videoElement.classList.remove('hidden');
+                }
+            } catch (err) {
+                console.error("Webcam error:", err);
+                showToast("Could not access webcam.", "error");
+            }
+        }
+
+        function stopWebcam() {
+            if (!state.isWebcamOn) return;
+            const stopTrack = (videoEl) => {
+                if (videoEl.srcObject) {
+                    videoEl.srcObject.getTracks().forEach(track => track.stop());
+                    videoEl.srcObject = null;
+                }
+            }
+            stopTrack(registerVideo);
+            stopTrack(attendanceVideo);
+            state.isWebcamOn = false;
+        }
+
+        // --- DATABASE (LocalStorage) ---
+        function loadDataFromStorage() {
+            state.users = JSON.parse(localStorage.getItem('face-attendance-users')) || [];
+            state.attendance = JSON.parse(localStorage.getItem('face-attendance-records')) || [];
+        }
+
+        function saveUsers() {
+            localStorage.setItem('face-attendance-users', JSON.stringify(state.users));
+        }
+
+        function saveAttendance() {
+            localStorage.setItem('face-attendance-records', JSON.stringify(state.attendance));
+        }
+
+        // --- FACE RECOGNITION CORE LOGIC ---
+        // This mirrors your Python backend's `get_face_embedding` and `compare_faces`
+        
+        async function createFaceMatcher() {
+            if (state.users.length === 0) {
+                state.faceMatcher = null;
+                return;
+            }
+
+            const labeledFaceDescriptors = state.users.map(user => {
+                const descriptor = new Float32Array(Object.values(user.descriptor));
+                return new faceapi.LabeledFaceDescriptors(user.id, [descriptor]);
+            });
+            
+            state.faceMatcher = new faceapi.FaceMatcher(labeledFaceDescriptors, 0.6); // 0.6 is the distance threshold
+        }
+
+        async function getFaceDescriptor(input) {
+            const detection = await faceapi.detectSingleFace(input).withFaceLandmarks().withFaceDescriptor();
+            return detection ? detection.descriptor : null;
+        }
+
+        // --- DASHBOARD ---
+        function updateDashboardStats() {
+            const today = new Date().toDateString();
+            const todayAttendance = state.attendance.filter(record => new Date(record.timestamp).toDateString() === today);
+            
+            totalUsersStat.textContent = state.users.length;
+            todayAttendanceStat.textContent = todayAttendance.length;
+            totalRecordsStat.textContent = state.attendance.length;
+        }
+
+        // --- USER REGISTRATION ---
+        captureRegisterBtn.addEventListener('click', () => {
+            const context = registerCanvas.getContext('2d');
+            registerCanvas.width = registerVideo.videoWidth;
+            registerCanvas.height = registerVideo.videoHeight;
+            context.drawImage(registerVideo, 0, 0, registerCanvas.width, registerCanvas.height);
+            
+            state.registerPhotoData = registerCanvas.toDataURL('image/jpeg');
+            registerPhoto.src = state.registerPhotoData;
+            registerPhoto.classList.remove('hidden');
+            registerVideo.classList.add('hidden');
+            showToast("Photo captured successfully!", "success");
+        });
+
+        registerForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            if (!state.registerPhotoData) {
+                showToast("Please capture a photo first.", "warning");
+                return;
+            }
+
+            const name = document.getElementById('name').value;
+            const employeeId = document.getElementById('employee-id').value;
+            const department = document.getElementById('department').value;
+            const email = document.getElementById('email').value;
+
+            if (state.users.some(u => u.employeeId === employeeId)) {
+                showToast("Sutudent ID already exists.", "error");
+                return;
+            }
+            
+            loadingOverlay.style.display = 'flex';
+            loadingText.textContent = "Analyzing face...";
+
+            const descriptor = await getFaceDescriptor(registerPhoto);
+
+            if (!descriptor) {
+                loadingOverlay.style.display = 'none';
+                showToast("No face detected in the photo. Please try again.", "error");
+                return;
+            }
+            
+            const newUser = {
+                id: crypto.randomUUID(),
+                name,
+                employeeId,
+                department,
+                email,
+                photo: state.registerPhotoData,
+                descriptor,
+                createdAt: new Date().toISOString()
+            };
+
+            state.users.push(newUser);
+            saveUsers();
+            await createFaceMatcher();
+            
+            // Reset form
+            registerForm.reset();
+            state.registerPhotoData = null;
+            registerPhoto.classList.add('hidden');
+            registerVideo.classList.remove('hidden');
+            
+            loadingOverlay.style.display = 'none';
+            showToast("User registered successfully!", "success");
+            updateDashboardStats();
+            showView('dashboard');
+        });
+
+        // --- MARK ATTENDANCE ---
+        markAttendanceBtn.addEventListener('click', async () => {
+            if (!state.faceMatcher) {
+                showToast("No users are registered. Please register a user first.", "warning");
+                return;
+            }
+
+            loadingOverlay.style.display = 'flex';
+            loadingText.textContent = "Recognizing face...";
+
+            const context = attendanceCanvas.getContext('2d');
+            attendanceCanvas.width = attendanceVideo.videoWidth;
+            attendanceCanvas.height = attendanceVideo.videoHeight;
+            context.drawImage(attendanceVideo, 0, 0, attendanceCanvas.width, attendanceCanvas.height);
+            const photoData = attendanceCanvas.toDataURL('image/jpeg');
+            
+            const descriptor = await getFaceDescriptor(attendanceCanvas);
+
+            if (!descriptor) {
+                loadingOverlay.style.display = 'none';
+                showToast("No face detected. Please position yourself clearly.", "error");
+                return;
+            }
+
+            const bestMatch = state.faceMatcher.findBestMatch(descriptor);
+            
+            loadingOverlay.style.display = 'none';
+
+            if (bestMatch.label === 'unknown') {
+                showToast("Face not recognized. Please try again or register.", "error");
+            } else {
+                const user = state.users.find(u => u.id === bestMatch.label);
+                
+                const today = new Date().toDateString();
+                const alreadyMarked = state.attendance.some(
+                    record => record.userId === user.id && new Date(record.timestamp).toDateString() === today
+                );
+
+                if (alreadyMarked) {
+                     showToast(`Attendance already marked for ${user.name} today.`, "warning");
+                } else {
+                    const newRecord = {
+                        id: crypto.randomUUID(),
+                        userId: user.id,
+                        userName: user.name,
+                        employeeId: user.employeeId,
+                        department: user.department,
+                        timestamp: new Date().toISOString(),
+                        photo: photoData
+                    };
+                    state.attendance.push(newRecord);
+                    saveAttendance();
+                    showToast(`Welcome, ${user.name}! Attendance marked.`, "success");
+                    updateDashboardStats();
+                    showView('dashboard');
+                }
+            }
+        });
+
+        // --- VIEW & MANAGE ---
+        function renderUsersTable() {
+            if (state.users.length === 0) {
+                noUsersFound.classList.remove('hidden');
+                usersTableBody.innerHTML = '';
+            } else {
+                noUsersFound.classList.add('hidden');
+                usersTableBody.innerHTML = state.users.map(user => `
+                    <tr class="border-b">
+                        <td class="p-3"><img src="${user.photo}" class="w-12 h-12 rounded-full object-cover"></td>
+                        <td class="p-3 font-medium">${user.name}</td>
+                        <td class="p-3 text-gray-600">${user.employeeId}</td>
+                        <td class="p-3 text-gray-600">${user.department}</td>
+                        <td class="p-3 text-gray-600">${user.email}</td>
+                        <td class="p-3">
+                            <button data-userid="${user.id}" class="delete-user-btn text-red-500 hover:text-red-700">Delete</button>
+                        </td>
+                    </tr>
+                `).join('');
+            }
+        }
+        
+        function renderAttendanceTable(records = state.attendance) {
+             if (records.length === 0) {
+                noAttendanceRecords.classList.remove('hidden');
+                attendanceTableBody.innerHTML = '';
+            } else {
+                noAttendanceRecords.classList.add('hidden');
+                // Sort by most recent first
+                const sortedRecords = records.sort((a,b) => new Date(b.timestamp) - new Date(a.timestamp));
+                attendanceTableBody.innerHTML = sortedRecords.map(record => `
+                    <tr class="border-b">
+                        <td class="p-3"><img src="${record.photo}" class="w-12 h-12 rounded-full object-cover"></td>
+                        <td class="p-3 font-medium">${record.userName}</td>
+                        <td class="p-3 text-gray-600">${record.employeeId}</td>
+                        <td class="p-3 text-gray-600">${record.department}</td>
+                        <td class="p-3 text-gray-600">${new Date(record.timestamp).toLocaleString()}</td>
+                    </tr>
+                `).join('');
+            }
+        }
+        
+        // --- EVENT LISTENERS FOR DYNAMIC CONTENT ---
+        document.body.addEventListener('click', async (e) => {
+            if (e.target.classList.contains('delete-user-btn')) {
+                const userId = e.target.dataset.userid;
+                if(confirm("Are you sure you want to delete this user? This action cannot be undone.")){
+                    // Find user index and remove
+                    const userIndex = state.users.findIndex(u => u.id === userId);
+                    if (userIndex > -1) {
+                        state.users.splice(userIndex, 1);
+                        saveUsers();
+
+                        // Also remove associated attendance records
+                        state.attendance = state.attendance.filter(rec => rec.userId !== userId);
+                        saveAttendance();
+
+                        // Re-render and update dependencies
+                        renderUsersTable();
+                        await createFaceMatcher();
+                        updateDashboardStats();
+                        showToast("User deleted successfully.", "success");
+                    }
+                }
+            }
+        });
+
+        filterAttendanceBtn.addEventListener('click', () => {
+            const startDate = document.getElementById('start-date').value;
+            const endDate = document.getElementById('end-date').value;
+
+            let filteredRecords = state.attendance;
+
+            if(startDate) {
+                filteredRecords = filteredRecords.filter(r => new Date(r.timestamp) >= new Date(startDate));
+            }
+            if(endDate) {
+                 // Add 1 day to end date to make it inclusive
+                const end = new Date(endDate);
+                end.setDate(end.getDate() + 1);
+                filteredRecords = filteredRecords.filter(r => new Date(r.timestamp) < end);
+            }
+            renderAttendanceTable(filteredRecords);
+        });
+
+        exportCsvBtn.addEventListener('click', () => {
+            if (state.attendance.length === 0) {
+                showToast("No attendance records to export.", "warning");
+                return;
+            }
+
+            const headers = "Name,Student ID,Department,Timestamp\n";
+            const rows = state.attendance.map(r => 
+                `"${r.userName}","${r.employeeId}","${r.department}","${new Date(r.timestamp).toLocaleString()}"`
+            ).join('\n');
+            const csvContent = "data:text/csv;charset=utf-8," + headers + rows;
+
+            const encodedUri = encodeURI(csvContent);
+            const link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            link.setAttribute("download", "attendance_records.csv");
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        });
+
+        // --- UTILS ---
+        function showToast(message, type = 'info') {
+            const toast = document.getElementById('toast');
+            const toastMessage = document.getElementById('toast-message');
+            
+            toast.classList.remove('bg-sky-500', 'bg-emerald-500', 'bg-amber-500', 'bg-red-500', 'hidden');
+            
+            let bgColor = 'bg-sky-500';
+            if (type === 'success') bgColor = 'bg-emerald-500';
+            if (type === 'warning') bgColor = 'bg-amber-500';
+            if (type === 'error') bgColor = 'bg-red-500';
+
+            toast.classList.add(bgColor);
+            toastMessage.textContent = message;
+            toast.classList.remove('hidden');
+
+            setTimeout(() => {
+                toast.classList.add('hidden');
+            }, 3000);
+        }
+
+        // --- START APP ---
+        initializeApp();
+    });
+    </script>
+</body>
+</html>
